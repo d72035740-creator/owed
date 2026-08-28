@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 import type { ConsumerRefundState } from "@/services/consumer-refund";
@@ -40,8 +40,11 @@ export function OwedJourney({
   const [pending, setPending] = useState<PendingAction>(null);
   const [error, setError] = useState<string | null>(null);
   const processingStarted = useRef(false);
+  const actionInFlight = useRef(false);
 
   async function post(path: string, action: Exclude<PendingAction, null>) {
+    if (actionInFlight.current) return state;
+    actionInFlight.current = true;
     setPending(action);
     setError(null);
     try {
@@ -52,11 +55,14 @@ export function OwedJourney({
       setError(caught instanceof Error ? caught.message : "The demo could not continue");
       throw caught;
     } finally {
+      actionInFlight.current = false;
       setPending(null);
     }
   }
 
   async function validateDestination() {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setPending("validate");
     setError(null);
     const poll = window.setInterval(async () => {
@@ -80,6 +86,7 @@ export function OwedJourney({
       );
     } finally {
       window.clearInterval(poll);
+      actionInFlight.current = false;
       setPending(null);
     }
   }
@@ -144,6 +151,7 @@ export function OwedJourney({
   const complete = state.refund.status === "COMPLETED";
 
   return (
+    <MotionConfig reducedMotion="user">
     <main id="top" className="owed-shell">
       <OwedHeader onRestart={() => void restart()} disabled={pending !== null} />
       <div className="case-bar" aria-label="Current case">
@@ -185,7 +193,12 @@ export function OwedJourney({
 
             <AnimatePresence initial={false}>
               {showDestination ? (
-                <motion.div key="destination" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                <motion.div
+                  key="destination"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                >
                   <BankDestination
                     destination={state.destination}
                     validationActive={pending === "validate"}
@@ -227,6 +240,7 @@ export function OwedJourney({
       </div>
       <TransparencyDrawer state={state} />
     </main>
+    </MotionConfig>
   );
 }
 

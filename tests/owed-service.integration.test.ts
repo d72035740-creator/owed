@@ -247,6 +247,32 @@ describe.sequential("repository-backed OwedService", () => {
     120_000,
   );
 
+  it("resets repeatedly without duplicating seeded records", async () => {
+    await service.resetDemo();
+    await service.resetDemo();
+
+    const [obligation, destination, attempts, events] = await Promise.all([
+      obligationRepository.getById(testIds.obligationId),
+      destinationRepository.getById(testIds.hdfcDestinationId),
+      deliveryRepository.listForObligation(testIds.obligationId),
+      auditRepository.listForObligation(testIds.obligationId),
+    ]);
+
+    expect(obligation?.status).toBe("OWED");
+    expect(destination).toMatchObject({
+      validationStatus: "UNVALIDATED",
+      refundAuthorized: false,
+      version: 1,
+    });
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({
+      id: testIds.failedAttemptId,
+      status: "FAILED",
+      failureReason: "ACCOUNT_CLOSED",
+    });
+    expect(events.map((event) => event.id)).toEqual(testIds.auditEventIds);
+  }, 120_000);
+
   it("Test B — persists destination validation and its audit events", async () => {
     await service.validateDestination();
 

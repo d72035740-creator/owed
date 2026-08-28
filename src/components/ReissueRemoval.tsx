@@ -11,12 +11,13 @@ export function ReissueRemoval() {
     >
       <motion.div
         className="removed-request-box"
-        initial={{ opacity: 1, height: "auto" }}
+        initial={{ opacity: 1, maxHeight: 180 }}
         animate={{
           opacity: [1, 1, 0.45, 0],
-          height: ["auto", "auto", "auto", 0],
+          maxHeight: [180, 180, 180, 0],
           marginBottom: [24, 24, 12, 0],
         }}
+        style={{ overflow: "hidden" }}
         transition={{ delay: 0.35, duration: 1.05, times: [0, 0.35, 0.72, 1] }}
       >
           <p className="small-label">Unnecessary procedure</p>

@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { and, eq, ne } from "drizzle-orm";
 import {
   DEMO_OBLIGATION_ID,
   DEMO_USER_ID,
@@ -17,6 +18,17 @@ import {
 
 async function seed(): Promise<void> {
   await db.transaction(async (transaction) => {
+    await transaction
+      .delete(auditEvents)
+      .where(eq(auditEvents.obligationId, DEMO_OBLIGATION_ID));
+    await transaction
+      .delete(deliveryAttempts)
+      .where(
+        and(
+          eq(deliveryAttempts.obligationId, DEMO_OBLIGATION_ID),
+          ne(deliveryAttempts.id, FAILED_ATTEMPT_ID),
+        ),
+      );
     await transaction
       .insert(users)
       .values({ id: DEMO_USER_ID, displayName: "Meera Sharma" })
@@ -75,7 +87,38 @@ async function seed(): Promise<void> {
           version: 1,
         },
       ])
-      .onConflictDoNothing({ target: refundDestinations.id });
+      .onConflictDoUpdate({
+        target: refundDestinations.id,
+        set: {
+          userId: DEMO_USER_ID,
+          accountHolder: "Meera Sharma",
+          version: 1,
+          updatedAt: new Date(),
+        },
+      });
+
+    await transaction
+      .update(refundDestinations)
+      .set({
+        bankName: "SBI",
+        maskedAccount: "••••1028",
+        validationStatus: "VALIDATED",
+        refundAuthorized: true,
+        validatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(refundDestinations.id, SBI_DESTINATION_ID));
+    await transaction
+      .update(refundDestinations)
+      .set({
+        bankName: "HDFC Bank",
+        maskedAccount: "••••4821",
+        validationStatus: "UNVALIDATED",
+        refundAuthorized: false,
+        validatedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(refundDestinations.id, HDFC_DESTINATION_ID));
 
     await transaction
       .insert(deliveryAttempts)

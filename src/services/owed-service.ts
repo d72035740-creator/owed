@@ -573,16 +573,22 @@ export function createOwedService(options: OwedServiceOptions): OwedService {
     },
 
     async resetDemo() {
-      await deliveryRepository.resetDemo(
-        options.obligationId,
-        options.originalAttemptId,
-      );
-      await destinationRepository.resetDemo(options.replacementDestinationId);
-      await obligationRepository.resetDemo(options.obligationId);
-      await auditRepository.resetDemo(
-        options.obligationId,
-        options.initialAuditEventIds,
-      );
+      await transactionRunner.run(async (transactionRepositories) => {
+        await transactionRepositories.deliveryRepository.resetDemo(
+          options.obligationId,
+          options.originalAttemptId,
+        );
+        await transactionRepositories.destinationRepository.resetDemo(
+          options.replacementDestinationId,
+        );
+        await transactionRepositories.obligationRepository.resetDemo(
+          options.obligationId,
+        );
+        await transactionRepositories.auditRepository.resetDemo(
+          options.obligationId,
+          options.initialAuditEventIds,
+        );
+      });
       return load();
     },
   };
