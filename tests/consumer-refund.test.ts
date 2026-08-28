@@ -35,6 +35,13 @@ describe("consumer refund mapper", () => {
     });
     expect(JSON.stringify(consumer)).not.toContain("idempotencyKey");
     expect(JSON.stringify(consumer)).not.toContain("legalHold");
+    expect(consumer.technical).toMatchObject({
+      obligationStatus: "OWED",
+      previousDeliveryStatus: "FAILED",
+      previousFailureReason: "ACCOUNT_CLOSED",
+      destinationValidationStatus: "UNVALIDATED",
+      idempotencyProtectionActive: true,
+    });
   });
 
   it("derives the required completed outcome metrics from persisted events", () => {

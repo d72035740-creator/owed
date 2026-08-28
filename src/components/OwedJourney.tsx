@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ConsumerRefundState } from "@/services/consumer-refund";
 import { BankDestination } from "./BankDestination";
 import { EventTimeline } from "./EventTimeline";
-import { EvidenceDrawer } from "./EvidenceDrawer";
+import { ObligationRoute } from "./ObligationRoute";
 import { ObligationToken } from "./ObligationToken";
 import { OutcomeMetrics } from "./OutcomeMetrics";
 import { OwedHeader } from "./OwedHeader";
@@ -52,6 +52,34 @@ export function OwedJourney({
       setError(caught instanceof Error ? caught.message : "The demo could not continue");
       throw caught;
     } finally {
+      setPending(null);
+    }
+  }
+
+  async function validateDestination() {
+    setPending("validate");
+    setError(null);
+    const poll = window.setInterval(async () => {
+      try {
+        setState(
+          await readState(await fetch("/api/owed", { cache: "no-store" })),
+        );
+      } catch {
+        // The validation request remains authoritative.
+      }
+    }, 250);
+    try {
+      setState(
+        await readState(
+          await fetch("/api/owed/validate", { method: "POST" }),
+        ),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Validation could not continue",
+      );
+    } finally {
+      window.clearInterval(poll);
       setPending(null);
     }
   }
@@ -118,21 +146,37 @@ export function OwedJourney({
   return (
     <main id="top" className="owed-shell">
       <OwedHeader onRestart={() => void restart()} disabled={pending !== null} />
-      <div className="page-grid">
-        <aside className="identity-rail" aria-label="Citizen">
+      <div className="case-bar" aria-label="Current case">
+        <div>
           <p className="citizen-name">{state.citizen.name}</p>
           <p>{state.citizen.age} · {state.citizen.occupation}</p>
-          <p className="synthetic-note">Synthetic demonstration record</p>
-        </aside>
-        <div className="journey-column">
-          <ObligationToken refund={state.refund} />
+        </div>
+        <p className="case-status"><span aria-hidden="true" /> {complete ? "Payment complete" : "Recovery in progress"}</p>
+        <p className="synthetic-note">Synthetic record</p>
+      </div>
+      <ObligationRoute state={state} />
+
+      <div className="service-workspace">
+        <aside className="obligation-column">
+          <ObligationToken refund={state.refund} previousPayment={state.previousPayment} />
           <RefundContext state={state} />
+        </aside>
+
+        <div className="action-console">
+          <div className="console-heading">
+            <div><span>Destination repair</span><strong>{state.destination.validationStatus}</strong></div>
+            <div><span>Refund authorization</span><strong>{state.destination.refundAuthorized ? "AUTHORIZED" : "NOT AUTHORIZED"}</strong></div>
+          </div>
 
           <section className="repair-section" aria-labelledby="repair-heading">
             <div className="repair-heading-row">
               <div>
-                <p className="section-number">02 / Repair destination</p>
-                <h2 id="repair-heading" className="section-title font-editorial">Give the existing refund somewhere valid to go.</h2>
+                <p className="section-number">Refund destination</p>
+                <h2 id="repair-heading" className="section-title font-editorial">
+                  {showDestination
+                    ? `HDFC ${state.destination.maskedAccount}`
+                    : "Destination needs repair"}
+                </h2>
               </div>
               {!showDestination && !complete ? (
                 <button className="primary-action" type="button" onClick={revealRepair}>Fix where my refund goes</button>
@@ -142,11 +186,17 @@ export function OwedJourney({
             <AnimatePresence initial={false}>
               {showDestination ? (
                 <motion.div key="destination" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                  <BankDestination destination={state.destination} />
+                  <BankDestination
+                    destination={state.destination}
+                    validationActive={pending === "validate"}
+                  />
                   {state.destination.validationStatus === "UNVALIDATED" ? (
-                    <button className="primary-action destination-action" type="button" disabled={pending !== null} onClick={() => void post("/api/owed/validate", "validate").catch(() => undefined)}>
-                      {pending === "validate" ? "Validating with simulated bank…" : "Validate account"}
+                    <button className="primary-action destination-action" type="button" disabled={pending !== null} onClick={() => void validateDestination()}>
+                      {pending === "validate" ? "Validating account…" : "Validate account"}
                     </button>
+                  ) : null}
+                  {pending === "validate" || state.destination.validationStatus === "VALIDATING" ? (
+                    <div className="validation-progress" role="status"><span className="working-dot" aria-hidden="true" /> Validating HDFC {state.destination.maskedAccount}</div>
                   ) : null}
                   {state.destination.validationStatus === "VALIDATED" && !state.destination.refundAuthorized ? (
                     <RefundAuthorization onAuthorize={() => void post("/api/owed/authorize", "authorize").catch(() => undefined)} pending={pending === "authorize"} />
@@ -173,9 +223,9 @@ export function OwedJourney({
           <EventTimeline events={state.timeline} />
 
           {error ? <p className="error-message" role="alert">{error}</p> : null}
-          <div className="disclosures"><TransparencyDrawer /><EvidenceDrawer /></div>
         </div>
       </div>
+      <TransparencyDrawer state={state} />
     </main>
   );
 }

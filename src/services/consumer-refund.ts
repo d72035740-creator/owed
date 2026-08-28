@@ -45,6 +45,26 @@ export interface ConsumerRefundState {
     readonly destinationRepairs: number;
     readonly reapplications: 0;
   };
+  readonly technical: {
+    readonly obligationStatus: "OWED" | "BLOCKED" | "COMPLETED";
+    readonly previousDeliveryStatus: "FAILED";
+    readonly previousFailureReason: DeliveryFailureReason;
+    readonly destinationValidationStatus:
+      | "UNVALIDATED"
+      | "VALIDATING"
+      | "VALIDATED"
+      | "FAILED";
+    readonly destinationAuthorized: boolean;
+    readonly retryStatus:
+      | "NOT_SCHEDULED"
+      | "SCHEDULED"
+      | "PROCESSING"
+      | "FAILED"
+      | "DELIVERED";
+    readonly retryLifecycle: readonly ("SCHEDULED" | "PROCESSING" | "DELIVERED")[];
+    readonly idempotencyProtectionActive: true;
+    readonly duplicateRetryPrevented: boolean;
+  };
 }
 
 const failureReasonLabels: Readonly<Record<DeliveryFailureReason, string>> = {
@@ -97,6 +117,15 @@ export function toConsumerRefundState(state: OwedState): ConsumerRefundState {
   if (!previousDestination || !replacementDestination) {
     throw new Error("Synthetic refund destinations are incomplete");
   }
+  const retryAttempts = state.deliveryAttempts.filter(
+    (attempt) => attempt.id !== failedAttempt.id,
+  );
+  const retry = retryAttempts.at(-1);
+  const eventTypes = new Set(state.auditEvents.map((event) => event.type));
+  const retryLifecycle: ("SCHEDULED" | "PROCESSING" | "DELIVERED")[] = [];
+  if (eventTypes.has("RETRY_SCHEDULED")) retryLifecycle.push("SCHEDULED");
+  if (eventTypes.has("RETRY_PROCESSING")) retryLifecycle.push("PROCESSING");
+  if (eventTypes.has("PAYMENT_DELIVERED")) retryLifecycle.push("DELIVERED");
 
   return {
     citizen: {
@@ -143,6 +172,17 @@ export function toConsumerRefundState(state: OwedState): ConsumerRefundState {
         (event) => event.type === "DESTINATION_VALIDATED",
       ).length,
       reapplications: 0,
+    },
+    technical: {
+      obligationStatus: state.obligation.status,
+      previousDeliveryStatus: "FAILED",
+      previousFailureReason: failedAttempt.failureReason,
+      destinationValidationStatus: replacementDestination.validationStatus,
+      destinationAuthorized: replacementDestination.refundAuthorized,
+      retryStatus: retry?.status ?? "NOT_SCHEDULED",
+      retryLifecycle,
+      idempotencyProtectionActive: true,
+      duplicateRetryPrevented: retryAttempts.length === 1,
     },
   };
 }

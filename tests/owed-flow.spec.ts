@@ -61,6 +61,10 @@ test("completes the synthetic OWED journey", async ({ page, request }) => {
   await expect(page.locator(".metrics-grid div").nth(2)).toContainText("0");
   await expect(page.locator(".metrics-grid div").nth(2)).toContainText("reapplications");
   await expect(page.getByRole("button", { name: /Retry refund|Refund Reissue|Submit refund/i })).toHaveCount(0);
+  await page.getByText("View what OWED did", { exact: true }).click();
+  await expect(page.getByText("OWED → COMPLETED", { exact: true })).toBeVisible();
+  await expect(page.getByText("SCHEDULED → PROCESSING → DELIVERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("PREVENTED", { exact: true })).toBeVisible();
 
   await reloadUntilVisible(page, "#outcome-heading");
   await expect(page.locator("#outcome-heading")).toHaveText("₹23,740 delivered", {
