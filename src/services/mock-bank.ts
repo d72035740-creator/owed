@@ -20,6 +20,11 @@ export interface MockBankAdapter {
   deliverPayment(attempt: DeliveryAttempt): Promise<PaymentDeliveryResult>;
 }
 
+// TODO(real payment rail): use DeliveryAttempt.idempotencyKey as the external
+// payment reference and add status lookup/reconciliation. That is required to
+// recover if payment succeeds externally before the local completion
+// transaction commits.
+
 type Wait = (milliseconds: number) => Promise<void>;
 
 function simulatedWait(milliseconds: number): Promise<void> {
