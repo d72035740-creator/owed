@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 
+export const runtime = "nodejs";
+
 const instrumentSerif = Instrument_Serif({
   variable: "--font-editorial",
   subsets: ["latin"],
